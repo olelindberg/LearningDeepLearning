@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import matplotlib.pyplot as plt
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -7,9 +8,9 @@ np.random.seed(0)
 
 class ScalarDataset(torch.utils.data.Dataset):
     def __init__(self, num_values, transform=None, target_transform=None):
-        self._x = np.zeros((num_values, 1), dtype=np.float32)
+        self._x = np.zeros((num_values, 1, 1), dtype=np.float32)
 
-        self._x[:, 0] = np.float32(np.random.random([num_values]))
+        self._x[:, 0, 0] = np.float32(np.random.random([num_values]))
         self._y = self._x
 
         self.transform = transform
@@ -36,12 +37,19 @@ device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is
 class NeuralNetwork(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self._linear = torch.nn.Linear(1, 1, bias=True)
+        self._linear = torch.nn.Linear(1, 1, bias=False)
 
     def forward(self, x):
         x1 = self._linear(x)
-        x2 = torch.nn.functional.relu(x1)
+        x2 = torch.nn.functional.leaky_relu(x1)
         return x2
+
+    def print(self):
+        print(self._linear.weight.data)
+        print(self._linear.bias)
+
+
+lossall = []
 
 
 def train(dataloader, model, loss_fn, optimizer, scheduler):
@@ -57,13 +65,12 @@ def train(dataloader, model, loss_fn, optimizer, scheduler):
         # Backpropagation
         loss.backward()
         optimizer.step()
-        scheduler.step()
 
         optimizer.zero_grad()
 
         loss, current = loss.item(), (batch + 1) * len(X)
-
         print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+    scheduler.step()
 
 
 def test(dataloader, model, loss_fn):
@@ -75,26 +82,31 @@ def test(dataloader, model, loss_fn):
         for X, y in dataloader:
             X, y = X.to(device), y.to(device)
             pred = model(X)
+            print("Target")
+            print(X)
+            print("Predic")
+            print(pred)
             test_loss += loss_fn(pred, y).item()
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+            lossall.append(loss_fn(pred, y).item())
     test_loss /= num_batches
     correct /= size
-    print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+    print(f"Test Error: \n Accuracy: {(100*correct):>0.6f}%, Avg loss: {test_loss:>8f} \n")
 
 
 batch_size = 1
-num_epochs = 10
-num_values = 10
+num_epochs = 200
+num_values = 1
 
 training_data = ScalarDataset(num_values)
 test_data = ScalarDataset(num_values)
-train_dataloader = torch.utils.data.DataLoader(training_data, batch_size=batch_size)
+train_dataloader = torch.utils.data.DataLoader(training_data, batch_size=batch_size, shuffle=True)
 test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=batch_size)
 
 
 model = NeuralNetwork().to(device)
 loss_fn = torch.nn.MSELoss()
-optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
 scheduler = torch.optim.lr_scheduler.OneCycleLR(
     optimizer,
     max_lr=1.0,
@@ -114,5 +126,9 @@ for X, y in test_dataloader:
 for t in range(num_epochs):
     print(f"Epoch {t+1}\n-------------------------------")
     train(train_dataloader, model, loss_fn, optimizer, scheduler)
-#    test(test_dataloader, model, loss_fn)
+    test(test_dataloader, model, loss_fn)
 print("Done!")
+model.print()
+
+plt.semilogy(lossall)
+plt.show()
