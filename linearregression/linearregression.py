@@ -15,6 +15,7 @@ class LinearRegressionModel(nn.Module):
 
 
 num_iter = 1000
+iter_tol = 1e-6
 
 x = np.array([[1], [2], [3], [3.5]])
 y = np.array([[2], [4], [6], [7.5]])
@@ -26,7 +27,13 @@ output_dim = 1
 model = LinearRegressionModel(input_dim, output_dim)
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1.0)
+scheduler = torch.optim.lr_scheduler.OneCycleLR(
+    optimizer,
+    max_lr=1.0,
+    steps_per_epoch=1,
+    epochs=num_iter)
 
+loss_prev = 0.0
 for iter in range(num_iter):
     inputs = Variable(torch.from_numpy(x))
     labels = Variable(torch.from_numpy(y))  # clear gradients wrt parameters
@@ -38,8 +45,13 @@ for iter in range(num_iter):
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
+    scheduler.step()
 
     print("iter {}, loss {}".format(iter, loss.data))
+
+    if (np.abs(loss.data-loss_prev)<iter_tol):
+        break
+    loss_prev = loss.data
 
 
 predicted = model.linear(Variable(torch.from_numpy(x)).float())
