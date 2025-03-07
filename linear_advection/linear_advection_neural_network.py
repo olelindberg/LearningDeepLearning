@@ -9,14 +9,20 @@ np.random.seed(0)
 # Define dataset
 #-----------------------------------------------------------------------------#
 class ScalarDataset(torch.utils.data.Dataset):
-    def __init__(self, num_datasets, transform=None, target_transform=None):
+    def __init__(self, transform=None, target_transform=None):
 
-        self._x = np.zeros((num_datasets, 2), dtype=np.float32)
+        features = np.loadtxt('linear_advection_features.csv', delimiter=',')
+        labels   = np.loadtxt('linear_advection_labels.csv',   delimiter=',')
+        
+        features = features.astype(np.float32)
+        labels   = labels.astype(np.float32)
 
-        for i in range(2):
-            self._x[:, i] = np.float32(np.random.random([num_datasets]))
+        self._x = features
+        self._y = labels
 
-        self._y = self._x[:,0] + 0.5*self._x[:,1]
+        print(f"Shape of features: {features.shape}")
+        print(f"Shape of labels: {labels.shape}")
+
 
         self.transform = transform
         self.target_transform = target_transform
@@ -47,9 +53,8 @@ class NeuralNetwork(torch.nn.Module):
         self._linear1 = torch.nn.Linear(2, 1, bias=False)
 
     def forward(self, x):
-        x1 = torch.nn.functional.relu(x)
-        x2 = self._linear1(x1)
-        return x2
+        x1 = self._linear1(x)
+        return x1
 
     def print(self):
         print(self._linear1.weight.data)
@@ -76,11 +81,13 @@ def train(dataloader, model, loss_fn, optimizer, scheduler,iter_tol=1e-6):
         optimizer.step()
 
         optimizer.zero_grad()
-
+        
+        model.print()
+        
         loss_value, current = loss.item(), (batch + 1) * len(X)
         loss_values.append(loss_value)
 
-#    scheduler.step()
+    scheduler.step()
 
     return loss_values
 
@@ -101,8 +108,6 @@ def test(dataloader, model, loss_fn):
 
         X.values = X.cpu().detach().numpy()
         pred.values = pred.cpu().detach().numpy()
-        print(f"X: {X.values}")
-        print(f"pred: {pred.values}")
 
         loss_value, current = loss.item(), (batch + 1) * len(X)
 
@@ -110,29 +115,28 @@ def test(dataloader, model, loss_fn):
 
 
 batch_size = 1
-num_epochs = 100
-num_datasets = 100
+num_epochs = 1
 
-training_data    = ScalarDataset(num_datasets)
+training_data    = ScalarDataset()
 train_dataloader = torch.utils.data.DataLoader(training_data, batch_size=batch_size, shuffle=True)
 
-test_data        = ScalarDataset(num_datasets)
+test_data        = ScalarDataset()
 test_dataloader  = torch.utils.data.DataLoader(test_data, batch_size=batch_size)
 
 model = NeuralNetwork().to(device)
 loss_fn = torch.nn.MSELoss()
-optimizer = torch.optim.RMSprop(model.parameters())
-#optimizer = torch.optim.Adam(model.parameters())
-#scheduler = torch.optim.lr_scheduler.OneCycleLR(
-#    optimizer,
-#    max_lr=1.0,
-#    steps_per_epoch=len(training_data),
-#    epochs=num_epochs,
-#    verbose=False,
-#    final_div_factor=1e4,
-#    anneal_strategy="cos",
-#)
-scheduler = []
+#optimizer = torch.optim.RMSprop(model.parameters(), lr=0.01)
+optimizer = torch.optim.Adam(model.parameters())
+scheduler = torch.optim.lr_scheduler.OneCycleLR(
+    optimizer,
+    max_lr=0.1,
+    steps_per_epoch=len(training_data),
+    epochs=num_epochs,
+    verbose=False,
+    final_div_factor=1e4,
+    anneal_strategy="cos",
+)
+#scheduler = []
 
 for X, y in test_dataloader:
     print(f"Shape of X [N, C, H, W]: {X.shape}")
@@ -151,9 +155,9 @@ for epoch in range(num_epochs):
     
     loss = train(train_dataloader, model, loss_fn, optimizer, scheduler)
 
-    print(f"iter: {epoch:d}, loss: {loss[-1]:>7e}")
+    print(f"epoch: {epoch:d}, loss: {loss[-1]:>7e}")
 
-    if (np.abs(loss[-1]-loss_prev)<iter_tol):
+    if (np.abs(loss[-1])<iter_tol):
         break
 
     loss_prev = loss[-1]
@@ -167,7 +171,7 @@ with torch.no_grad():
     test_loss = test(test_dataloader, model, loss_fn)
     print(f"Test Error: \n Accuracy: {test_loss:>7f} \n")
 
-model.print()
+
 
 
 
