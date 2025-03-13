@@ -12,7 +12,7 @@ x  = np.arange(0,Lx,dx)
 # Time axis:
 CFL = 0.5
 dt = CFL * dx / advection_speed
-Nt = 100
+Nt = 1000
 
 print(f"CFL: {CFL}")
 
@@ -27,9 +27,8 @@ u_nn    = np.array(u_exact)
 for n in range(Nt):
 
     u[1:]    = u[1:] + dt * (u[0:-1] - u[1:])/dx
-    u_ls[1:] = 0.50010616*u_ls[0:-1] + 0.50005777*u_ls[1:]
-    u_nn[1:] = 0.3123*u_nn[0:-1] + 0.6966*u_nn[1:]
-    
+    u_ls[1:] = 0.5002468416186744*u_ls[0:-1] + 0.5002468416184698*u_ls[1:]
+    u_nn[1:] = 0.5002468429562265*u_nn[0:-1] + 0.5002468403727589*u_nn[1:]
  
     time    = (n+1) * dt
     u_exact = np.sin(wave_number*x - angular_freq*time)
@@ -38,10 +37,11 @@ for n in range(Nt):
     u_nn[0] = u_exact[0]
 
     plt.cla()
-    plt.plot(x,u_exact)
-    plt.plot(x,u)
-    plt.plot(x,u_ls) 
-    plt.plot(x,u_nn)
+    plt.plot(x,u_exact,label='Exact')
+    plt.plot(x,u,label='Upwind')
+    plt.plot(x,u_ls,label='Least Squares') 
+    plt.plot(x,u_nn,label='Neural Network')
+    plt.legend()
     plt.title(f"Time: {time:.2f}")
     plt.grid()
     plt.ylim([-1, 1])
