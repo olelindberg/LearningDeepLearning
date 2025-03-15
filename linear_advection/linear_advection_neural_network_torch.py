@@ -13,8 +13,8 @@ torch.set_default_dtype(torch.float64)
 # -----------------------------------------------------------------------------#
 class ScalarDataset(torch.utils.data.Dataset):
     def __init__(self, transform=None, target_transform=None):
-        features = np.loadtxt("linear_advection_features_downwind.csv", delimiter=",")
-        labels = np.loadtxt("linear_advection_labels_downwind.csv", delimiter=",")
+        features = np.loadtxt("linear_advection_features_upwind.csv", delimiter=",")
+        labels = np.loadtxt("linear_advection_labels_upwind.csv", delimiter=",")
 
         features = features.astype(np.float64)
         labels = labels.astype(np.float64)
@@ -93,7 +93,7 @@ def train(dataloader, model, loss_function, optimizer,tol=1e-10):
 
 batch_size = 16
 num_epochs = 200
-tol = 1e-10
+tol = 1e-16
 
 training_data       = ScalarDataset()
 train_dataloader    = torch.utils.data.DataLoader(training_data, batch_size=batch_size, shuffle=True)
@@ -103,7 +103,7 @@ loss_function    = torch.nn.MSELoss()
 optimizer        = torch.optim.SGD(model.parameters(), lr=0.5)
 
 
-rmse = train(train_dataloader, model, loss_function, optimizer)
+rmse = train(train_dataloader, model, loss_function, optimizer,tol)
     
 
 model.print()
