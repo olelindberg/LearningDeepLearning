@@ -13,8 +13,8 @@ torch.set_default_dtype(torch.float64)
 # -----------------------------------------------------------------------------#
 class ScalarDataset(torch.utils.data.Dataset):
     def __init__(self, transform=None, target_transform=None):
-        features = np.loadtxt("linear_advection_features.csv", delimiter=",")
-        labels = np.loadtxt("linear_advection_labels.csv", delimiter=",")
+        features = np.loadtxt("linear_advection_features_downwind.csv", delimiter=",")
+        labels = np.loadtxt("linear_advection_labels_downwind.csv", delimiter=",")
 
         features = features.astype(np.float64)
         labels = labels.astype(np.float64)
@@ -41,7 +41,7 @@ device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is
 # -----------------------------------------------------------------------------#
 # Define model:
 # -----------------------------------------------------------------------------#
-class NeuralNetwork(torch.nn.Module):
+class LinearAdvectionModel(torch.nn.Module):
     def __init__(self):
         super().__init__()
         self._linear1 = torch.nn.Linear(2, 1, bias=False)
@@ -57,61 +57,65 @@ class NeuralNetwork(torch.nn.Module):
 # -----------------------------------------------------------------------------#
 # Define training function:
 # -----------------------------------------------------------------------------#
-def train(dataloader, model, loss_fn, optimizer):
+def train(dataloader, model, loss_function, optimizer,tol=1e-10):
+
     model.train()
-    loss_values = []
-    for batch, (X, y) in enumerate(dataloader):
-        X, y = X.to(device), y.to(device)
 
-        optimizer.zero_grad()
-        pred = model(X)
-        loss = loss_fn(pred, y)
-        loss.backward()
-        optimizer.step()
+    rmse = []
 
-        loss_values.append(loss.item())
+    is_done = False
+    for epoch in range(num_epochs):
 
-    return loss_values
+        loss_values = []
+        for batch, (X, y) in enumerate(dataloader):
+            X, y = X.to(device), y.to(device)
+
+            optimizer.zero_grad()
+            pred = model(X)
+            loss = loss_function(pred, y)
+            loss.backward()
+            optimizer.step()
+
+            loss_values.append(loss.item())
+
+            if np.abs(np.sqrt(loss.item())) < tol:
+                is_done = True
+                break
+
+        rmse.extend(np.sqrt(loss_values))
+        print(f"epoch: {epoch:d}, loss: {rmse[-1]:>7e}")
+
+        if is_done:
+            break
+
+    return rmse
 
 
-batch_size = 1
+batch_size = 16
 num_epochs = 200
+tol = 1e-10
 
 training_data       = ScalarDataset()
 train_dataloader    = torch.utils.data.DataLoader(training_data, batch_size=batch_size, shuffle=True)
 
-model       = NeuralNetwork().to(device)
-loss_fn     = torch.nn.MSELoss()
-optimizer   = torch.optim.SGD(model.parameters(), lr=0.5)
+model            = LinearAdvectionModel().to(device)
+loss_function    = torch.nn.MSELoss()
+optimizer        = torch.optim.SGD(model.parameters(), lr=0.5)
 
 
-# --------------------------------------------------------------------------------#
-# Training loop
-# --------------------------------------------------------------------------------#
-tol = 1e-10
-rmse = []
-
-for epoch in range(num_epochs):
-
-    loss = train(train_dataloader, model, loss_fn, optimizer)
+rmse = train(train_dataloader, model, loss_function, optimizer)
     
-    rmse.append(np.sqrt(np.mean(loss)))
-
-    print(f"epoch: {epoch:d}, loss: {rmse[-1]:>7e}")
-
-    if np.abs(rmse[-1]) < tol:
-        break
 
 model.print()
 print(np.array(model._linear1.weight.data).squeeze())
 
 # --------------------------------------------------------------------------------#
-# Plot loss
+# Plot rmse
 # --------------------------------------------------------------------------------#
 plt.plot(np.log10(rmse), ".-")
-plt.xlabel("Epoch")
+plt.xlabel("step")
 plt.ylabel("log10(rmse)")
-plt.title("Training loss")
-plt.ylim(-16, 0)
+plt.title("Training rmse")
+#plt.ylim(-16, 0)
 plt.grid(True)
 plt.show()
