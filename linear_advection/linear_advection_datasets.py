@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-show_plots = True
+show_plots = False
 
 
 CFL         = 0.5
@@ -24,7 +24,7 @@ dt = CFL * dx / speed
 Nt = int(period / dt) + 1
 t = np.arange(0, period + dt , dt)
 
-for stencil in ["upwind"]:  # upwind, downwind, centered
+for stencil in ["upwind","downwind","centered"]:  # upwind, downwind, centered
 
     if stencil == "upwind":
         
@@ -116,8 +116,8 @@ for stencil in ["upwind"]:  # upwind, downwind, centered
                 plt.plot(x,u,'r')
                 plt.plot(x,u,'m.')
 
-                plt.plot(pos[k,:],features[k,:],'co')
-                plt.plot(x[i],labels[k,0],'mo')
+#                plt.plot(pos[k,:],features[k,:],'co')
+#                plt.plot(x[i],labels[k,0],'mo')
                 #plt.legend()
                 plt.title(f"Time: {n}")
                 plt.grid()
