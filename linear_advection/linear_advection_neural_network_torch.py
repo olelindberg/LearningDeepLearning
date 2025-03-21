@@ -13,8 +13,8 @@ torch.set_default_dtype(torch.float64)
 # -----------------------------------------------------------------------------#
 class ScalarDataset(torch.utils.data.Dataset):
     def __init__(self, transform=None, target_transform=None):
-        features = np.loadtxt("linear_advection_features_upwind.csv", delimiter=",")
-        labels = np.loadtxt("linear_advection_labels_upwind.csv", delimiter=",")
+        features = np.loadtxt("linear_advection_features_upwind_gaussian.csv", delimiter=",")
+        labels   = np.loadtxt("linear_advection_labels_upwind_gaussian.csv"  , delimiter=",")
 
         features = features.astype(np.float64)
         labels = labels.astype(np.float64)
@@ -70,6 +70,8 @@ def train(dataloader, model, loss_function, optimizer,tol=1e-10):
         for batch, (X, y) in enumerate(dataloader):
             X, y = X.to(device), y.to(device)
 
+#            model.print()
+
             optimizer.zero_grad()
             pred = model(X)
             loss = loss_function(pred, y)
@@ -78,12 +80,15 @@ def train(dataloader, model, loss_function, optimizer,tol=1e-10):
 
             loss_values.append(loss.item())
 
-            if np.abs(np.sqrt(loss.item())) < tol:
-                is_done = True
-                break
+#            print(f"epoch: {epoch:d}, batch: {batch:d}, loss: {np.sqrt(loss.item()):>7e}")
+
+#            if np.abs(np.sqrt(loss.item())) < tol:
+#                is_done = True
+#                break
 
         rmse.extend(np.sqrt(loss_values))
         print(f"epoch: {epoch:d}, loss: {rmse[-1]:>7e}")
+        model.print()
 
         if is_done:
             break
@@ -91,8 +96,8 @@ def train(dataloader, model, loss_function, optimizer,tol=1e-10):
     return rmse
 
 
-batch_size = 16
-num_epochs = 200
+batch_size = 128
+num_epochs = 1000
 tol = 1e-16
 
 training_data       = ScalarDataset()
@@ -107,7 +112,7 @@ rmse = train(train_dataloader, model, loss_function, optimizer,tol)
     
 
 model.print()
-print(np.array(model._linear1.weight.data).squeeze())
+#print(np.array(model._linear1.weight.data).squeeze())
 
 # --------------------------------------------------------------------------------#
 # Plot rmse
